@@ -1,0 +1,5 @@
+{
+  "name": "zero2prod-cpp",
+  "version": "0.1.0",
+  "dependencies": ["drogon"]
+}
