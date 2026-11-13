@@ -7,4 +7,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Drogon CONFIG REQUIRED)
 
+enable_testing()
 add_subdirectory(src)
+add_subdirectory(tests)

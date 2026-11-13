@@ -1,0 +1,67 @@
+#pragma once
+#include <drogon/drogon.h>
+#include <trantor/net/EventLoopThread.h>
+#include "zero2prod/app.hpp"
+
+#include <chrono>
+#include <stdexcept>
+#include <string>
+#include <thread>
+
+namespace zero2prod::testing {
+
+// One event loop used ONLY by test HTTP clients. It must never be a loop the
+// server runs on, or the blocking sendRequest() below would deadlock.
+inline trantor::EventLoopThread &clientLoopThread() {
+    static trantor::EventLoopThread loopThread;
+    static bool started = [] { loopThread.run(); return true; }();
+    (void)started;
+    return loopThread;
+}
+
+inline drogon::HttpClientPtr newClient(const std::string &baseUrl) {
+    return drogon::HttpClient::newHttpClient(baseUrl, clientLoopThread().getLoop());
+}
+
+class TestApp {
+public:
+    static TestApp &instance() {
+        static TestApp app;
+        return app;
+    }
+    std::string baseUrl() const { return "http://127.0.0.1:8001"; }
+
+    ~TestApp() {
+        // Stop Drogon's loop and wait for the server thread. Skipping this
+        // makes the process abort with a FATAL during static destruction.
+        drogon::app().quit();
+        if (server_.joinable()) server_.join();
+    }
+
+private:
+    TestApp() {
+        server_ = std::thread([] {
+            zero2prod::registerRoutes();
+            drogon::app().addListener("127.0.0.1", 8001);
+            drogon::app().run();
+        });
+        waitUntilReady(std::chrono::seconds(3));
+    }
+
+    void waitUntilReady(std::chrono::seconds timeout) {
+        auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline) {
+            auto client = newClient(baseUrl());
+            auto req = drogon::HttpRequest::newHttpRequest();
+            req->setPath("/health_check");
+            auto [result, resp] = client->sendRequest(req, 0.5);
+            if (result == drogon::ReqResult::Ok) return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        throw std::runtime_error("app did not become ready in time");
+    }
+
+    std::thread server_;
+};
+
+}  // namespace zero2prod::testing
