@@ -1,15 +1,18 @@
 
 #include "zero2prod/app.hpp"
 
+#include <cstdlib>
+#include <iostream>
+
 int main() {
-    // 1. Register the routes (see app.cpp). Nothing is listening yet.
-    zero2prod::registerRoutes();
-
-    // 2. Listen on every network interface ("0.0.0.0"), port 8000.
+    const char *url = std::getenv("DATABASE_URL");
+    if (!url) {
+        std::cerr << "DATABASE_URL is not set\n";
+        return 1;
+    }
+    auto db = std::make_shared<pqxx::connection>(url);
+    zero2prod::registerRoutes(db);
     drogon::app().addListener("0.0.0.0", 8000);
-
-    // 3. Start serving. run() does not return until the process is stopped
-    //    (Ctrl-C, or a SIGTERM from your deployment platform).
     drogon::app().run();
     return 0;
 }

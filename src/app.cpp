@@ -1,21 +1,17 @@
-
 #include "zero2prod/app.hpp"
+#include "zero2prod/subscriptions.hpp"
 
 namespace zero2prod {
 
-// The handler. Drogon requires exactly these two parameter types (writing "auto" instead
-// does not compile). The request is unused here, so it has no name. Call the callback
-// exactly once to send the response.
 void healthCheck(const drogon::HttpRequestPtr &, Callback &&callback) {
-    // A new response is "200 OK" with an empty body unless you change it.
-    callback(drogon::HttpResponse::newHttpResponse());
+    callback(drogon::HttpResponse::newHttpResponse());  // 200 OK, empty body
 }
 
-void registerRoutes() {
-    drogon::app().registerHandler(
-        "/health_check",  // 1. the URL path
-        &healthCheck,     // 2. the function to run when a request arrives for it
-        {drogon::Get});   // 3. only answer GET requests
+void registerRoutes(std::shared_ptr<pqxx::connection> db) {
+    drogon::app().registerHandler("/health_check", &healthCheck, {drogon::Get});
+
+    (void)db;  // subscription routes arrive in 3.9
+    registerSubscriptionRoutes(std::move(db));
 }
 
 }  // namespace zero2prod
